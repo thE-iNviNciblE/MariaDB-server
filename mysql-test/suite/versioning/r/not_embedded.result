@@ -1,3 +1,6 @@
+#
+# DELETE HISTORY and privileges
+#
 connect  root,localhost,root,,test;
 connection root;
 create database mysqltest;
@@ -31,3 +34,29 @@ GRANT DELETE HISTORY ON `mysqltest`.* TO `mysqltest_1`@`localhost`
 GRANT DELETE HISTORY ON `mysqltest`.`t` TO `mysqltest_1`@`localhost`
 drop user mysqltest_1@localhost;
 drop database mysqltest;
+disconnect user1;
+disconnect root;
+connection default;
+#
+# MDEV-25559 Auto-create: infinite loop after interrupted lock wait
+#
+set timestamp= unix_timestamp('2000-01-01 00:00:00');
+create table t (pk int primary key, a int) engine innodb with system versioning
+partition by system_time interval 1 hour auto;
+insert into t values (1, 0);
+begin;
+update t set a= a + 1;
+connect  con1,localhost,root,,;
+set max_statement_time= 1;
+set timestamp= unix_timestamp('2000-01-01 01:00:00');
+update t set a= a + 2;
+connection default;
+set timestamp= unix_timestamp('2000-01-01 01:00:00');
+update t set a= a + 3;
+connection con1;
+ERROR 70100: Query execution was interrupted (max_statement_time exceeded)
+disconnect con1;
+connection default;
+commit;
+drop table t;
+set timestamp= default;
