@@ -1,0 +1,10 @@
+--- versioning.result
++++ versioning,vers_stopword.reject
+@@ -688,7 +688,6 @@
+ SELECT * FROM articles WHERE MATCH (title,body)
+ AGAINST ('the' IN NATURAL LANGUAGE MODE);
+ id	title	body
+-5	MySQL vs. YourSQL	In the following database comparison ...
+ SELECT * FROM articles WHERE MATCH (title,body)
+ AGAINST ('this' IN NATURAL LANGUAGE MODE);
+ id	title	body

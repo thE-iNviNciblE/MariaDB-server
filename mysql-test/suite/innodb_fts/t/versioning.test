@@ -89,9 +89,43 @@ alter table articles force;
 let $basic_stage= select_3;
 --source basic.inc
 
+drop table articles;
+
+--echo # Upgrade test (stopword)
+let $stopword_stage= create_table;
+--source stopword.inc
+insert into articles (title, body)
+values ('test for stopwords','this is it...');
+insert into user_stopword values("the");
+delete from user_stopword;
+insert into user_stopword values("this");
+
 let $restart_bindir=;
 --source include/restart_mysqld.inc
 
-alter table articles force;
+set global innodb_ft_server_stopword_table= "test/user_stopword";
+let $stopword_stage= select_1;
+--source stopword.inc
+drop index idx on articles;
+create fulltext index idx on articles(title, body);
+--source stopword.inc
 
+--echo # Downgrade test (stopword)
+let $restart_bindir= $OLD_BINDIR;
+--source include/restart_mysqld.inc
+
+set global innodb_ft_server_stopword_table= "test/user_stopword";
+let $stopword_stage= select_1;
+# Downgrade faults with assertion "dict_index_get_n_unique(index) == 1"
+# until we rebuilt the index:
+drop index idx on articles;
+create fulltext index idx on articles(title, body);
+--source stopword.inc
+
+
+let $restart_bindir=;
+--source include/restart_mysqld.inc
 drop table articles;
+drop table user_stopword;
+
+set global innodb_ft_server_stopword_table= default;

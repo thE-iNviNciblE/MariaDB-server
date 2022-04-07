@@ -3,66 +3,12 @@
 -- source include/have_innodb.inc
 -- source include/maybe_versioning.inc
 
---disable_query_log
-set @dbug_tables= @@global.debug_dbug;
-set @dbug_stopword= '';
-if ($MTR_COMBINATION_VERS_STOPWORD)
-{
-  set @dbug_stopword= '+d,sysvers_force,sysvers_hide';
-  if (!$have_debug)
-  {
-    --skip Requires debug
-  }
-}
---enable_query_log
-
-call mtr.add_suppression("\\[ERROR\\] InnoDB: user stopword table not_defined does not exist.");
-call mtr.add_suppression("\\[ERROR\\] InnoDB: user stopword table test/user_stopword_session does not exist.");
-
-select * from information_schema.innodb_ft_default_stopword;
-
-# Create FTS table
-CREATE TABLE articles (
-        id INT UNSIGNED AUTO_INCREMENT NOT NULL PRIMARY KEY,
-        title VARCHAR(200),
-        body TEXT,
-        FULLTEXT (title,body)
-        ) ENGINE=InnoDB;
-
-# Insert six rows
-INSERT INTO articles (title,body) VALUES
-        ('MySQL Tutorial','DBMS stands for DataBase ...')  ,
-        ('How To Use MySQL Well','After you went through a ...'),
-        ('Optimizing MySQL','In this tutorial we will show ...'),
-        ('1001 MySQL Tricks','1. Never run mysqld as root. 2. ...'),
-        ('MySQL vs. YourSQL','In the following database comparison ...'),
-        ('MySQL Security','When configured properly, MySQL ...');
-
-# "the" is in the default stopword, it would not be selected
-SELECT * FROM articles WHERE MATCH (title,body)
-        AGAINST ('the' IN NATURAL LANGUAGE MODE);
-
 SET @innodb_ft_server_stopword_table_orig=@@innodb_ft_server_stopword_table;
 SET @innodb_ft_enable_stopword_orig=@@innodb_ft_enable_stopword;
 SET @innodb_ft_user_stopword_table_orig=@@innodb_ft_user_stopword_table;
 
-# Provide user defined stopword table, if not (correctly) defined,
-# it will be rejected
---error ER_WRONG_VALUE_FOR_VAR
-set global innodb_ft_server_stopword_table = "not_defined";
-set global innodb_ft_server_stopword_table = NULL;
-
-# Define a correct formated user stopword table
-set debug_dbug= @dbug_stopword;
-create table user_stopword(value varchar(30)) engine = innodb;
-set debug_dbug= @dbug_tables;
-
-# The set operation should be successful
-set global innodb_ft_server_stopword_table = "test/user_stopword";
-
-drop index title on articles;
-
-create fulltext index idx on articles(title, body);
+let $stopword_stage= create_table;
+--source stopword.inc
 
 # Now we should be able to find "the"
 SELECT * FROM articles WHERE MATCH (title,body)
@@ -87,6 +33,8 @@ SELECT * FROM articles_2 WHERE MATCH (title,body)
 
 # Ok, let's instantiate some value into user supplied stop word
 # table
+insert into user_stopword values("the");
+delete from user_stopword;
 insert into user_stopword values("this");
 
 # Ok, let's repeat with the new table again.
@@ -119,6 +67,8 @@ if ($have_debug)
   --enable_query_log
 }
 
+insert into user_stopword values("this");
+delete from user_stopword;
 insert into user_stopword_session values("session");
 
 set session innodb_ft_user_stopword_table="test/user_stopword_session";
@@ -360,6 +310,8 @@ create table server_stopword(value varchar(30)) engine = innodb;
 # The set operation should be successful
 set global innodb_ft_server_stopword_table = "test/server_stopword";
 # Add values into user supplied stop word table
+insert into user_stopword values("when"),("where");
+delete from user_stopword;
 insert into user_stopword values("this"),("will"),("the");
 
 # Drop existing index and create the FTS index Using Alter Table. 
