@@ -20591,9 +20591,8 @@ for purge thread */
 static TABLE* innodb_find_table_for_vc(THD* thd, dict_table_t* table)
 {
 	ut_ad(!THDVAR(thd, background_thread));
-	if (table->vc_templ != NULL) {
-		ut_d(uint64_t qid= thd_get_query_id(thd));
-		ut_ad(table->vc_templ->mysql_table_query_id == qid);
+	if (table->vc_templ != NULL &&
+	    table->vc_templ->mysql_table_query_id == thd_get_query_id(thd)) {
 		return table->vc_templ->mysql_table;
 	}
 
