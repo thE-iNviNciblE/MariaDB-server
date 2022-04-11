@@ -20485,6 +20485,7 @@ static bool table_name_parse(
 
 /** Acquire metadata lock and MariaDB table handle for an InnoDB table.
 Unlocks dict_sys.latch and requires it locked before the call.
+Leaves the latch locked if new table has no vcol indexes, or in case of error.
 @param[in,out]	thd		thread handle
 @param[in,out]	table_ref	InnoDB table will be reopened, new instance is
 				returned
@@ -20549,7 +20550,6 @@ retry_mdl:
 release_fail:
 		table->release();
 fail:
-		rw_lock_s_unlock(&dict_sys.latch);
 		if (mariadb_table) {
 			close_thread_tables(thd);
 		}
@@ -20565,6 +20565,14 @@ fail:
 
 	if (mariadb_table && !strcmp(db_buf, db_buf1)
 			&& !strcmp(tbl_buf, tbl_buf1)) {
+		/* There may be no more virtual columns left while the latch
+		   was released and some alter table worked in parallel.
+		   Handle this table as usual, under latch acquired.
+		*/
+		if (!dict_table_has_indexed_v_cols(table)) {
+			close_thread_tables(thd);
+			return NULL;
+		}
 		rw_lock_s_unlock(&dict_sys.latch);
 		return mariadb_table;
 	}
