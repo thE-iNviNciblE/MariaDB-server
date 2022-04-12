@@ -20528,6 +20528,9 @@ retry_mdl:
 	TABLE*	mariadb_table = open_purge_table(thd, db_buf, db_buf_len,
 						 tbl_buf, tbl_buf_len);
 	if (!mariadb_table) {
+		if (thd_get_error_number(current_thd) != ER_NO_SUCH_TABLE)
+			ib::error() << "open_purge_table: Wrong error code "
+				<< thd_get_error_number(current_thd);
 		ut_ad(thd_get_error_number(current_thd) == ER_NO_SUCH_TABLE);
 		thd_clear_error(thd);
         }
