@@ -4369,6 +4369,9 @@ int create_table_impl(THD *thd,
 #else
       warning_given=1;
 #endif /* NO_EMBEDDED_ACCESS_CHECKS */
+      if (create_table_mode == C_ALTER_TABLE_FRM_ONLY || create_table_mode == C_ALTER_TABLE)
+        warning_given= 0;
+
       if (warning_given)
           push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
                               ER_TABLE_EXISTS_ERROR,

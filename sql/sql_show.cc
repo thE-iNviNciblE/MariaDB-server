@@ -5803,9 +5803,9 @@ err:
 
 /**
  @brief           Fill IS.table with temporary tables
+ @param[in]       thd                  thread handle
  @param[in]       table                I_S table (TABLE)
- @param[in]       db_name              db name of temporary table
- @param[in]       table_name           table name of temporary table
+ @param[in]       table_name           temporary table
  @return          Operation status
    @retval        0   - success
    @retval        1   - failure
