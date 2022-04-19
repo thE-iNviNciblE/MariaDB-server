@@ -844,6 +844,7 @@ String *Item_func_json_extract::read_json(String *str,
   for (n_arg=1; n_arg < arg_count; n_arg++)
   {
     json_path_with_flags *c_path= paths + n_arg - 1;
+    c_path->p.types_used= JSON_PATH_KEY_NULL;
     if (!c_path->parsed)
     {
       String *s_p= args[n_arg]->val_str(tmp_paths + (n_arg-1));
@@ -1460,6 +1461,7 @@ longlong Item_func_json_contains_path::val_int()
   for (n_arg=2; n_arg < arg_count; n_arg++)
   {
     json_path_with_flags *c_path= paths + n_arg - 2;
+    c_path->p.types_used= JSON_PATH_KEY_NULL;
     if (!c_path->parsed)
     {
       String *s_p= args[n_arg]->val_str(tmp_paths + (n_arg-2));
@@ -3633,6 +3635,7 @@ String *Item_func_json_search::val_str(String *str)
   for (n_arg=4; n_arg < arg_count; n_arg++)
   {
     json_path_with_flags *c_path= paths + n_arg - 4;
+    c_path->p.types_used= JSON_PATH_KEY_NULL;
     if (!c_path->parsed)
     {
       String *s_p= args[n_arg]->val_str(tmp_paths + (n_arg-4));

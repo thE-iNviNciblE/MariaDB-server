@@ -1373,6 +1373,8 @@ static int handle_match(json_engine_t *je, json_path_t *p,
       (int) (next_step->type & JSON_PATH_KEY_OR_ARRAY))
     return json_skip_level(je);
 
+  array_counters[next_step - p->steps]= 0;
+
   if (next_step->type & JSON_PATH_ARRAY)
   {
     int array_size;
@@ -1891,13 +1893,16 @@ int json_path_parts_compare(
     {
       if (b->type & JSON_PATH_ARRAY)
       {
-        int res= 0, corrected_n_item_a= 0, corrected_n_item_end_a= 0;
+        /*current_size is used to avoid overflow by adding 2 int during runtime.*/
+        int res= 0;
+        long int corrected_n_item_a= 0, corrected_n_item_end_a= 0, current_size= 0;
         if (array_sizes)
         {
-          corrected_n_item_a= a->n_item < 0 ? array_sizes[b-temp_b] +
+          current_size= array_sizes[b-temp_b];
+          corrected_n_item_a= a->n_item < 0 ? current_size +
                                                           a->n_item :
                                               a->n_item;
-          corrected_n_item_end_a= a->n_item_end < 0 ? array_sizes[b-temp_b] +
+          corrected_n_item_end_a= a->n_item_end < 0 ? current_size +
                                                               a->n_item_end :
                                                       a->n_item_end;
         }
@@ -1943,12 +1948,12 @@ step_fits:
 
     /* Double wild handling needs recursions. */
     res= json_path_parts_compare(a+1, a_end, b, b_end, vt,
-                                 array_sizes + (b - temp_b));
+                                 array_sizes ? array_sizes + (b - temp_b):NULL);
     if (res == 0)
       return 0;
 
     res2= json_path_parts_compare(a, a_end, b, b_end, vt,
-                                  array_sizes + (b - temp_b));
+                                  array_sizes ? array_sizes + (b - temp_b) : NULL);
 
     return (res2 >= 0) ? res2 : res;
 
@@ -1961,12 +1966,12 @@ step_fits_autowrap:
 
     /* Double wild handling needs recursions. */
     res= json_path_parts_compare(a+1, a_end, b+1, b_end, vt,
-                                 array_sizes + (b - temp_b));
+                                 array_sizes ? array_sizes + (b - temp_b) : NULL);
     if (res == 0)
       return 0;
 
     res2= json_path_parts_compare(a, a_end, b+1, b_end, vt,
-                                  array_sizes + (b - temp_b));
+                                  array_sizes ? array_sizes + (b - temp_b) : NULL);
 
     return (res2 >= 0) ? res2 : res;
 
