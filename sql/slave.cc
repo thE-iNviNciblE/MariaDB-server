@@ -6338,6 +6338,12 @@ dbug_gtid_accept:
           mi->last_queued_gtid.seq_no == 1000)
         goto skip_relay_logging;
     });
+    DBUG_EXECUTE_IF("slave_discard_xid_random",
+    {
+      /* Inject an event group that is missing its XID commit event. */
+      if (mi->last_queued_gtid.seq_no % (rand() % 10 + 1) == 0)
+        goto skip_relay_logging;
+    });
     goto default_action;
 #endif
   case START_ENCRYPTION_EVENT:
