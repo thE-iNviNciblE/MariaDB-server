@@ -4397,6 +4397,14 @@ connected:
       if (check_io_slave_killed(mi, NullS))
         goto err;
 
+      DBUG_EXECUTE_IF("slave_transient_error_at_read_random",
+      {
+        srand((uint) time(NULL));
+        /* Inject an event group that is missing its XID commit event. */
+        if (mi->last_queued_gtid.seq_no % (rand() % 20 + 1) == 0)
+          event_len= packet_error;
+      });
+
       if (event_len == packet_error)
       {
         uint mysql_error_number= mysql_errno(mysql);
