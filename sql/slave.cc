@@ -6146,6 +6146,12 @@ static int queue_event(Master_info* mi,const char* buf, ulong event_len)
                       mi->dbug_do_disconnect= true;
                       mi->dbug_event_counter= 2;
                     };);
+    DBUG_EXECUTE_IF("slave_discard_gtid_random",
+    {
+      /* Inject an event group that is missing its XID commit event. */
+      if (mi->last_queued_gtid.seq_no % (rand() % 10 + 1) == 0)
+        goto skip_relay_logging;
+    });
 
     uchar gtid_flag;
 
