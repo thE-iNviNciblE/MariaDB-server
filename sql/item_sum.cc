@@ -1346,6 +1346,8 @@ bool Item_sum_sum::fix_length_and_dec()
   {
     /* SUM result can't be longer than length(arg) + length(MAX_ROWS) */
     int precision= args[0]->decimal_precision() + DECIMAL_LONGLONG_DIGITS;
+    decimals= MY_MIN(decimals, DECIMAL_MAX_SCALE);
+    precision= MY_MIN(precision, DECIMAL_MAX_PRECISION);
     max_length= my_decimal_precision_to_length_no_truncation(precision,
                                                              decimals,
                                                              unsigned_flag);
@@ -1678,7 +1680,7 @@ bool Item_sum_avg::fix_length_and_dec()
                                                              decimals,
                                                              unsigned_flag);
     f_precision= MY_MIN(precision+DECIMAL_LONGLONG_DIGITS, DECIMAL_MAX_PRECISION);
-    f_scale=  args[0]->decimals;
+    f_scale=  MY_MIN(args[0]->decimals, DECIMAL_MAX_SCALE);
     dec_bin_size= my_decimal_get_binary_size(f_precision, f_scale);
   }
   else

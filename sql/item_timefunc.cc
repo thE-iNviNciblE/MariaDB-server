@@ -1493,13 +1493,8 @@ bool Item_temporal_func::fix_length_and_dec()
   maybe_null= (arg_count > 0);
   if (decimals)
   {
-    if (decimals == NOT_FIXED_DEC)
-      char_length+= TIME_SECOND_PART_DIGITS + 1;
-    else
-    {
-      set_if_smaller(decimals, TIME_SECOND_PART_DIGITS);
-      char_length+= decimals + 1;
-    }
+    set_if_smaller(decimals, TIME_SECOND_PART_DIGITS);
+    char_length+= decimals + 1;
   }
   sql_mode= current_thd->variables.sql_mode &
                  (MODE_NO_ZERO_IN_DATE | MODE_NO_ZERO_DATE);
