@@ -323,6 +323,7 @@ bool row_log_online_op(dict_index_t *index, const dtuple_t *tuple,
 	log = index->online_log;
 	mysql_mutex_lock(&log->mutex);
 
+start_log:
 	if (trx_id > log->max_trx) {
 		log->max_trx = trx_id;
 	}
@@ -398,6 +399,8 @@ bool row_log_online_op(dict_index_t *index, const dtuple_t *tuple,
 			if (!index->online_log) {
 				goto err_exit;
 			}
+
+			goto start_log;
 		}
 
 		if (mrec_size == avail_size) {
@@ -3959,14 +3962,7 @@ void UndorecApplier::log_insert(const dtuple_t &tuple,
   mtr.start();
   rec_t *rec;
   rec_t *match_rec= get_old_rec(tuple, clust_index, &rec, &offsets, &mtr);
-  if (!match_rec)
-  {
-    /* Undo log record doesn't fit into the undo log page.
-    In that case, clustered index record won't be found */
-    mtr.commit();
-    return;
-  }
-
+  ut_a(match_rec);
   rec_t *copy_rec= match_rec;
   if (match_rec == rec)
   {
@@ -4058,11 +4054,7 @@ void UndorecApplier::log_update(const dtuple_t &tuple,
   bool is_update= (type == TRX_UNDO_UPD_EXIST_REC);
   rec_t *match_rec= get_old_rec(
     tuple, clust_index, &rec, &offsets, &mtr);
-  if (!match_rec)
-  {
-    mtr.commit();
-    return;
-  }
+  ut_a(match_rec);
 
   if (table_rebuild)
   {
@@ -4100,7 +4092,7 @@ void UndorecApplier::log_update(const dtuple_t &tuple,
   dtuple_t *row= nullptr;
   row_ext_t *new_ext;
   if (match_rec != rec)
-    row= row_build(ROW_COPY_POINTERS, clust_index, rec, offsets,
+    row= row_build(ROW_COPY_POINTERS, clust_index, match_rec, offsets,
                    clust_index->table, NULL, NULL, &new_ext, heap);
   else
     row= row_build(ROW_COPY_DATA, clust_index, rec, offsets,

@@ -1,0 +1,80 @@
+--source include/have_innodb.inc
+--source include/have_sequence.inc
+--source include/have_debug.inc
+
+# Encounter aborted online index during rollback of bulk insert
+
+CREATE TABLE t1(f1 INT NOT NULL, f2 INT NOT NULL,
+                PRIMARY KEY(f1))ENGINE=InnoDB;
+INSERT INTO t1 VALUES(1, 2), (2, 2);
+
+SET DEBUG_SYNC="innodb_rollback_inplace_alter_table SIGNAL dml_start WAIT_FOR dml_commit";
+send ALTER TABLE t1 ADD UNIQUE KEY(f2);
+
+connect(con1,localhost,root,,,);
+SET DEBUG_SYNC="now WAIT_FOR dml_start";
+BEGIN;
+DELETE FROM t1;
+SET DEBUG_SYNC="now SIGNAL dml_commit";
+
+connection default;
+--error ER_DUP_ENTRY
+reap;
+SET DEBUG_SYNC="now SIGNAL dml_resume";
+
+connection con1;
+SET DEBUG_SYNC="now WAIT_FOR dml_resume";
+COMMIT;
+--source include/wait_all_purged.inc
+SET unique_checks=0, foreign_key_checks=0;
+BEGIN;
+INSERT INTO t1 VALUES(1, 2);
+ROLLBACK;
+
+connection default;
+SELECT * FROM t1;
+SHOW CREATE TABLE t1;
+
+# Online alter logs ROW_LOG_EMPTY when table does bulk insert
+INSERT INTO t1 VALUES(1, 1);
+SET DEBUG_SYNC="now SIGNAL purge_stop";
+
+connection con1;
+SET DEBUG_SYNC="now WAIT_FOR purge_stop";
+START TRANSACTION WITH CONSISTENT SNAPSHOT;
+SET DEBUG_SYNC="now SIGNAL delete_start";
+
+connect(con2,localhost,root,,,);
+SET DEBUG_SYNC="now WAIT_FOR delete_start";
+DELETE FROM t1;
+SET DEBUG_SYNC="now SIGNAL ddl_start";
+
+connection default;
+SET DEBUG_SYNC="now WAIT_FOR ddl_start";
+SET DEBUG_SYNC="innodb_inplace_alter_table_enter SIGNAL purge_resume WAIT_FOR dml_commit";
+send ALTER TABLE t1 ADD INDEX(f2, f1);
+
+connection con1;
+SET DEBUG_SYNC="now WAIT_FOR purge_resume";
+COMMIT;
+SET DEBUG_SYNC="now SIGNAL dml_start";
+
+connection con2;
+SET DEBUG_SYNC="now WAIT_FOR dml_start";
+let $wait_all_purged=1;
+SET GLOBAL innodb_purge_rseg_truncate_frequency=1;
+--source include/wait_all_purged.inc
+SET unique_checks=0, foreign_key_checks=0;
+BEGIN;
+INSERT INTO t1 VALUES(2, 2);
+ROLLBACK;
+SET DEBUG_SYNC="now SIGNAL dml_commit";
+
+connection default;
+reap;
+SHOW CREATE TABLE t1;
+disconnect con1;
+disconnect con2;
+DROP TABLE t1;
+SET DEBUG_SYNC=RESET;
+SET GLOBAL innodb_purge_rseg_truncate_frequency=default;

@@ -7195,24 +7195,8 @@ error_handling:
 
 	ctx->trx->rollback();
 
-	if (ctx->need_rebuild()) {
-		/* Free the log for online table rebuild, if
-		one was allocated. */
-
-		dict_index_t* clust_index = dict_table_get_first_index(
-			user_table);
-
-		clust_index->lock.x_lock(SRW_LOCK_CALL);
-
-		if (clust_index->online_log) {
-			ut_ad(ctx->online);
-			row_log_abort_sec(clust_index);
-			clust_index->online_status
-				= ONLINE_INDEX_COMPLETE;
-		}
-
-		clust_index->lock.x_unlock();
-	}
+	ut_ad(!ctx->need_rebuild()
+	      || !user_table->indexes.start->online_log);
 
 	ctx->prebuilt->trx->error_info = NULL;
 	ctx->trx->error_state = DB_SUCCESS;
@@ -8749,6 +8733,7 @@ inline bool rollback_inplace_alter_table(Alter_inplace_info *ha_alter_info,
 
   DBUG_ENTER("rollback_inplace_alter_table");
 
+  DEBUG_SYNC_C("innodb_rollback_inplace_alter_table");
   if (!ctx)
     /* If we have not started a transaction yet,
     (almost) nothing has been or needs to be done. */
@@ -11012,8 +10997,8 @@ lock_fail:
 			for (ulint i = 0; i < ctx->num_to_add_index; i++) {
 				dict_index_t *index= ctx->add_index[i];
 
-				if (index->type & (DICT_FTS | DICT_SPATIAL))
-					continue;
+				ut_ad(!(index->type &
+					(DICT_FTS | DICT_SPATIAL)));
 
 				index->lock.x_lock(SRW_LOCK_CALL);
 				if (!index->online_log) {
@@ -11096,6 +11081,10 @@ err_index:
 			error = lock_table_for_trx(index_stats, trx, LOCK_X);
 		}
 	}
+
+	DBUG_EXECUTE_IF("stats_lock_fail",
+			error = DB_LOCK_WAIT;);
+
 	if (error == DB_SUCCESS) {
 		error = lock_sys_tables(trx);
 	}
