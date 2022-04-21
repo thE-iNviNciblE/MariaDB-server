@@ -1198,7 +1198,7 @@ extern "C" my_thread_id next_thread_id_noinline()
 #endif
 
 
-const Type_handler *THD::type_handler_for_datetime() const
+const Type_handler *type_handler_for_datetime() const
 {
   if (opt_mysql56_temporal_format)
     return &type_handler_datetime2;

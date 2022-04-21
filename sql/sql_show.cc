@@ -1254,12 +1254,13 @@ mysqld_show_create_get_fields(THD *thd, TABLE_LIST *table_list,
 {
   bool error= TRUE;
   LEX *lex= thd->lex;
+  auto table_type= lex->table_type;
   MEM_ROOT *mem_root= thd->mem_root;
   DBUG_ENTER("mysqld_show_create_get_fields");
   DBUG_PRINT("enter",("db: %s  table: %s",table_list->db.str,
                       table_list->table_name.str));
 
-  if (lex->table_type == TABLE_TYPE_VIEW)
+  if (table_type == TABLE_TYPE_VIEW)
   {
     if (check_table_access(thd, SELECT_ACL, table_list, FALSE, 1, FALSE))
     {
@@ -1324,13 +1325,13 @@ mysqld_show_create_get_fields(THD *thd, TABLE_LIST *table_list,
   }
 
   /* TODO: add environment variables show when it become possible */
-  if (lex->table_type == TABLE_TYPE_VIEW && !table_list->view)
+  if (table_type == TABLE_TYPE_VIEW && !table_list->view)
   {
     my_error(ER_WRONG_OBJECT, MYF(0),
              table_list->db.str, table_list->table_name.str, "VIEW");
     goto exit;
   }
-  else if (lex->table_type == TABLE_TYPE_SEQUENCE &&
+  else if (table_type == TABLE_TYPE_SEQUENCE &&
            (!table_list->table ||
             table_list->table->s->table_type != TABLE_TYPE_SEQUENCE))
   {
@@ -1401,34 +1402,50 @@ exit:
   table_list->db and table_list->table_name are kept unchanged to
   not cause problems with SP.
 */
+bool mysql_show_create_get_ddl(Protocol *protocol, TABLE_LIST *table_list);
 
 bool
-mysqld_show_create(THD *thd, TABLE_LIST *table_list)
+mysqld_show_create(THD *thd, TABLE_LIST *table_list) 
 {
-  Protocol *protocol= thd->protocol;
-  char buff[2048];
-  String buffer(buff, sizeof(buff), system_charset_info);
-  List<Item> field_list;
-  bool error= TRUE;
   DBUG_ENTER("mysqld_show_create");
   DBUG_PRINT("enter",("db: %s  table: %s",table_list->db.str,
-                      table_list->table_name.str));
-
+                       table_list->table_name.str));
+  
   /*
     Metadata locks taken during SHOW CREATE should be released when
     the statmement completes as it is an information statement.
   */
   MDL_savepoint mdl_savepoint= thd->mdl_context.mdl_savepoint();
+  
+  bool error= mysql_show_create_get_ddl(thd->protocol, table_list);
+  
+  
+  my_eof(thd);
+
+exit:
+  close_thread_tables(thd);
+  /* Release any metadata locks taken during SHOW CREATE. */
+  thd->mdl_context.rollback_to_savepoint(mdl_savepoint);
+  DBUG_RETURN(error);
+}
+
+bool mysql_show_create_get_ddl(Protocol *protocol, TABLE_LIST *table_list)
+{
+  char buff[2048];
+  String buffer(buff, sizeof(buff), system_charset_info);
+  List<Item> field_list;
+  bool error= TRUE;
+
 
   TABLE_LIST archive;
 
   if (mysqld_show_create_get_fields(thd, table_list, &field_list, &buffer))
-    goto exit;
+    return TRUE;
 
   if (protocol->send_result_set_metadata(&field_list,
                                          Protocol::SEND_NUM_ROWS |
                                          Protocol::SEND_EOF))
-    goto exit;
+    return TRUE;
 
   protocol->prepare_for_resend();
   if (table_list->view)
@@ -1459,13 +1476,7 @@ mysqld_show_create(THD *thd, TABLE_LIST *table_list)
     goto exit;
 
   error= FALSE;
-  my_eof(thd);
 
-exit:
-  close_thread_tables(thd);
-  /* Release any metadata locks taken during SHOW CREATE. */
-  thd->mdl_context.rollback_to_savepoint(mdl_savepoint);
-  DBUG_RETURN(error);
 }
 
 
@@ -1653,11 +1664,15 @@ static const char *require_quotes(const char *name, uint name_length)
 */
 
 bool
-append_identifier(THD *thd, String *packet, const char *name, size_t length)
+append_identifier(THD *thd, String *packet, const char *name, size_t length){
+  
+}
+
+append_identifier(ulonglong option_bits, ulonglong sql_mode, String *packet, const char *name, size_t length)
 {
   const char *name_end;
   char quote_char;
-  int q= get_quote_char_for_identifier(thd, name, length);
+  int q= get_quote_char_for_identifier(option_bits, sql_mode, name, length);
 
   if (q == EOF)
     return packet->append(name, length, packet->charset());
@@ -1732,14 +1747,14 @@ append_identifier(THD *thd, String *packet, const char *name, size_t length)
     #	  Quote character
 */
 
-int get_quote_char_for_identifier(THD *thd, const char *name, size_t length)
+int get_quote_char_for_identifier(ulonglong option_bits, ulonglong sql_mode, const char *name, size_t length)
 {
   if (length &&
       !is_keyword(name,(uint)length) &&
       !require_quotes(name, (uint)length) &&
-      !(thd->variables.option_bits & OPTION_QUOTE_SHOW_CREATE))
+      !(option_bits & OPTION_QUOTE_SHOW_CREATE))
     return EOF;
-  if (thd->variables.sql_mode & MODE_ANSI_QUOTES)
+  if (sql_mode & MODE_ANSI_QUOTES)
     return '"';
   return '`';
 }
@@ -2246,7 +2261,7 @@ int show_create_table(THD *thd, TABLE_LIST *table_list, String *packet,
 
     const Type_handler *th= field->type_handler();
     const Schema *implied_schema= Schema::find_implied(thd);
-    if (th != implied_schema->map_data_type(thd, th))
+    if (th != implied_schema->map_data_type(th))
     {
       packet->append(th->schema()->name(), system_charset_info);
       packet->append(STRING_WITH_LEN("."), system_charset_info);

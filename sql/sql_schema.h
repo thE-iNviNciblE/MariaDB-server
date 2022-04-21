@@ -28,7 +28,7 @@ public:
   { }
   virtual ~Schema() { }
   const LEX_CSTRING &name() const { return m_name; }
-  virtual const Type_handler *map_data_type(THD *thd, const Type_handler *src)
+  virtual const Type_handler *map_data_type(const Type_handler *src)
                                             const
   {
     return src;
