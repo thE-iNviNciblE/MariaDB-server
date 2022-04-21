@@ -11,6 +11,7 @@ wsrep-causal-reads=ON
 wsrep-sync-wait=15
 
 [mysqld.1]
+wsrep-on=1
 #galera_port=@OPT.port
 #ist_port=@OPT.port
 #sst_port=@OPT.port
@@ -21,6 +22,7 @@ wsrep_node_incoming_address=127.0.0.1:@mysqld.1.port
 wsrep_sst_receive_address='127.0.0.1:@mysqld.1.#sst_port'
 
 [mysqld.2]
+wsrep-on=1
 #galera_port=@OPT.port
 #ist_port=@OPT.port
 #sst_port=@OPT.port
@@ -31,6 +33,7 @@ wsrep_node_incoming_address=127.0.0.1:@mysqld.2.port
 wsrep_sst_receive_address='127.0.0.1:@mysqld.2.#sst_port'
 
 [mysqld.3]
+wsrep-on=1
 #galera_port=@OPT.port
 #ist_port=@OPT.port
 #sst_port=@OPT.port
@@ -41,6 +44,7 @@ wsrep_node_incoming_address=127.0.0.1:@mysqld.3.port
 wsrep_sst_receive_address='127.0.0.1:@mysqld.3.#sst_port'
 
 [mysqld.4]
+wsrep-on=1
 #galera_port=@OPT.port
 #ist_port=@OPT.port
 #sst_port=@OPT.port
