@@ -3960,7 +3960,11 @@ void UndorecApplier::log_insert(const dtuple_t &tuple,
   mtr.start();
   const rec_t *rec;
   const rec_t *match_rec= get_old_rec(tuple, clust_index, &rec, &offsets);
-  ut_a(match_rec);
+  if (!match_rec)
+  {
+    mtr.commit();
+    return;
+  }
   const rec_t *copy_rec= match_rec;
   if (match_rec == rec)
   {
@@ -4049,7 +4053,11 @@ void UndorecApplier::log_update(const dtuple_t &tuple,
   rec_t *prev_version;
   bool is_update= (type == TRX_UNDO_UPD_EXIST_REC);
   const rec_t *match_rec= get_old_rec(tuple, clust_index, &rec, &offsets);
-  ut_a(match_rec);
+  if (!match_rec)
+  {
+    mtr.commit();
+    return;
+  }
 
   if (table_rebuild)
   {

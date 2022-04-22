@@ -515,6 +515,7 @@ TRANSACTIONAL_TARGET void trx_free_at_shutdown(trx_t *trx)
 		         && !srv_undo_sources && srv_fast_shutdown))));
 	ut_a(trx->magic_n == TRX_MAGIC_N);
 
+	ut_d(trx->apply_online_log = false);
 	trx->commit_state();
 	trx->release_locks();
 	trx->mod_tables.clear();
