@@ -6763,8 +6763,21 @@ int handler::ha_write_row(const uchar *buf)
   mark_trx_read_write();
   increment_statistics(&SSV::ha_write_count);
 
-  if (table->s->long_unique_table)
+  /*
+    NOTE: write_partition is true in 2 cases:
+
+    1. under copy_partitions() (REORGANIZE PARTITION): that does not
+       require long unique check as it does not introduce new rows or new index.
+    2. under partition's ha_write_row() (INSERT): check_duplicate_long_entries()
+       was already done by ha_partition::ha_write_row(), no need to check it
+       again for each single partition.
+  */
+  const bool write_partition= table->part_info &&
+                              (ht->db_type != DB_TYPE_PARTITION_DB);
+
+  if (table->s->long_unique_table && !write_partition)
   {
+    DBUG_ASSERT(this == table->file);
     if (this->inited == RND)
       table->clone_handler_for_update();
     handler *h= table->update_handler ? table->update_handler : table->file;
@@ -6811,8 +6824,18 @@ int handler::ha_update_row(const uchar *old_data, const uchar *new_data)
   MYSQL_UPDATE_ROW_START(table_share->db.str, table_share->table_name.str);
   mark_trx_read_write();
   increment_statistics(&SSV::ha_update_count);
-  if (table->s->long_unique_table &&
-          (error= check_duplicate_long_entries_update(table, table->file, (uchar *)new_data)))
+
+  /*
+    NOTE: update_partition is true under partition's ha_update_row():
+    check_duplicate_long_entries_update() was already done by
+    ha_partition::ha_update_row(), no need to check it again for each single
+    partition.
+  */
+  const bool update_partition= table->part_info &&
+                               (ht->db_type != DB_TYPE_PARTITION_DB);
+  if (table->s->long_unique_table && !update_partition &&
+      (error= check_duplicate_long_entries_update(table, table->file,
+                                                  (uchar *)new_data)))
   {
     return error;
   }
