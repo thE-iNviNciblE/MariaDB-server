@@ -2333,8 +2333,8 @@ must hold a latch on the index page of the clustered index record.
 			though it has not yet done so
 @param	v_heap		memory heap used to create vrow
 			dtuple if it is not yet created. This heap
-                        diffs from "heap" above in that it could be
-                        prebuilt->old_vers_heap for selection
+			diffs from "heap" above in that it could be
+			prebuilt->old_vers_heap for selection
 @param	v_row		virtual column info, if any
 @param	v_status	status determine if it is going into this
 			function by purge thread or not.

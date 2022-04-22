@@ -1405,8 +1405,7 @@ public:
   @retval true if online log is dummy value */
   bool online_log_is_dummy() const
   {
-    return online_log == reinterpret_cast<row_log_t*>(
-                               const_cast<dict_index_t*>(this));
+    return online_log == reinterpret_cast<const row_log_t*>(this);
   }
 
   /** Assign clustered index online log to dummy value */

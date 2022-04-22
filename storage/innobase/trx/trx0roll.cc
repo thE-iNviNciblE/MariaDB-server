@@ -139,7 +139,7 @@ inline void trx_t::rollback_low(trx_savept_t *savept)
     const undo_no_t limit= savept->least_undo_no;
     apply_online_log= false;
     for (trx_mod_tables_t::iterator i= mod_tables.begin();
-	 i != mod_tables.end(); )
+         i != mod_tables.end(); )
     {
       trx_mod_tables_t::iterator j= i++;
       ut_ad(j->second.valid());
