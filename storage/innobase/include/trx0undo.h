@@ -368,7 +368,7 @@ public:
   /** Assign the undo log block */
   void assign_block(const buf_block_t *undo_block)
   {
-    this->block= undo_block;
+    block= undo_block;
   }
 
   /** Assign the undo log record and offset */
@@ -407,8 +407,7 @@ private:
   {
     uint16_t offset= static_cast<uint16_t>(roll_ptr);
     uint32_t page_no= static_cast<uint32_t>(roll_ptr >> 16);
-    return page_no == block->page.id().page_no()
-           && offset == this->offset;
+    return page_no == block->page.id().page_no() && offset == this->offset;
   }
 
   /** Clear the undo log record information */
@@ -435,8 +434,9 @@ private:
   @return clustered index record which was changed by
   the undo log record or nullptr when there is no clustered
   index record changed by undo log record */
-  rec_t* get_old_rec(const dtuple_t &tuple, dict_index_t *index,
-                     rec_t **clust_rec, rec_offs **offsets, mtr_t *mtr);
+  const rec_t* get_old_rec(const dtuple_t &tuple, dict_index_t *index,
+                           const rec_t **clust_rec, rec_offs **offsets,
+                           mtr_t *mtr);
 };
 
 #endif /* !UNIV_INNOCHECKSUM */

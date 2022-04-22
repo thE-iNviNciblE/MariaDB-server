@@ -3886,11 +3886,11 @@ void dict_table_t::clear(que_thr_t *thr)
   }
 }
 
-rec_t *UndorecApplier::get_old_rec(
+const rec_t *UndorecApplier::get_old_rec(
   const dtuple_t &tuple, dict_index_t *index,
-  rec_t **clust_rec, rec_offs **offsets, mtr_t *mtr)
+  const rec_t **clust_rec, rec_offs **offsets, mtr_t *mtr)
 {
-  ut_ad(dict_index_is_clust(index));
+  ut_ad(index->is_primary());
   btr_pcur_t pcur;
 
   bool found= row_search_on_row_ref(&pcur, BTR_MODIFY_LEAF,
@@ -3900,7 +3900,7 @@ rec_t *UndorecApplier::get_old_rec(
 
   ulint len= 0;
   rec_t *prev_version;
-  rec_t *version= *clust_rec;
+  const rec_t *version= *clust_rec;
   do
   {
     *offsets= rec_get_offsets(version, index, *offsets,
@@ -3926,12 +3926,12 @@ encountering the error during row_log_apply() in DML thread
 static void row_log_mark_other_online_index_abort(dict_table_t *table)
 {
   dict_index_t *clust_index= dict_table_get_first_index(table);
-  dict_index_t *index= dict_table_get_next_index(clust_index);
-  while (index)
+  for (dict_index_t *index= dict_table_get_next_index(clust_index);
+       index; index= dict_table_get_next_index(index))
   {
-    if (index->online_log
-        && index->online_status <= ONLINE_INDEX_CREATION
-        && !index->is_corrupted())
+    if (index->online_log &&
+        index->online_status <= ONLINE_INDEX_CREATION &&
+        !index->is_corrupted())
     {
       index->lock.x_lock(SRW_LOCK_CALL);
       row_log_abort_sec(index);
@@ -3939,7 +3939,6 @@ static void row_log_mark_other_online_index_abort(dict_table_t *table)
       index->lock.x_unlock();
       MONITOR_ATOMIC_INC(MONITOR_BACKGROUND_DROP_INDEX);
     }
-    index= dict_table_get_next_index(index);
   }
 
   clust_index->lock.x_lock(SRW_LOCK_CALL);
@@ -3953,17 +3952,17 @@ void UndorecApplier::log_insert(const dtuple_t &tuple,
                                 mem_heap_t *heap)
 {
   DEBUG_SYNC_C("row_log_insert_handle");
-  ut_ad(dict_index_is_clust(clust_index));
+  ut_ad(clust_index->is_primary());
   rec_offs offsets_[REC_OFFS_NORMAL_SIZE];
   rec_offs *offsets= offsets_;
   mtr_t mtr;
 
   rec_offs_init(offsets_);
   mtr.start();
-  rec_t *rec;
-  rec_t *match_rec= get_old_rec(tuple, clust_index, &rec, &offsets, &mtr);
+  const rec_t *rec;
+  const rec_t *match_rec= get_old_rec(tuple, clust_index, &rec, &offsets, &mtr);
   ut_a(match_rec);
-  rec_t *copy_rec= match_rec;
+  const rec_t *copy_rec= match_rec;
   if (match_rec == rec)
   {
     copy_rec= rec_copy(mem_heap_alloc(
@@ -3986,7 +3985,7 @@ void UndorecApplier::log_insert(const dtuple_t &tuple,
     clust_index->lock.s_unlock();
     row_ext_t *ext;
     dtuple_t *row= row_build(ROW_COPY_POINTERS, clust_index,
-      copy_rec, offsets, table, NULL, NULL, &ext, heap);
+      copy_rec, offsets, table, nullptr, nullptr, &ext, heap);
 
     if (table->n_v_cols)
     {
@@ -4049,22 +4048,22 @@ void UndorecApplier::log_update(const dtuple_t &tuple,
   clust_index->lock.s_unlock();
 
   mtr.start();
-  rec_t *rec;
+  const rec_t *rec;
   rec_t *prev_version;
   bool is_update= (type == TRX_UNDO_UPD_EXIST_REC);
-  rec_t *match_rec= get_old_rec(
+  const rec_t *match_rec= get_old_rec(
     tuple, clust_index, &rec, &offsets, &mtr);
   ut_a(match_rec);
 
   if (table_rebuild)
   {
-    rec_t *copy_rec= match_rec;
+    const rec_t *copy_rec= match_rec;
     if (match_rec == rec)
       copy_rec= rec_copy(mem_heap_alloc(
         heap, rec_offs_size(offsets)), match_rec, offsets);
     trx_undo_prev_version_build(rec, &mtr, match_rec, clust_index,
-                                offsets, heap, &prev_version, NULL,
-                                NULL, 0, block);
+                                offsets, heap, &prev_version, nullptr,
+                                nullptr, 0, block);
 
     prev_offsets= rec_get_offsets(prev_version, clust_index, prev_offsets,
                                   clust_index->n_core_fields,
@@ -4079,7 +4078,7 @@ void UndorecApplier::log_update(const dtuple_t &tuple,
       if (is_update)
       {
         const dtuple_t *rebuilt_old_pk= row_log_table_get_pk(
-          prev_version, clust_index, prev_offsets, NULL, &heap);
+          prev_version, clust_index, prev_offsets, nullptr, &heap);
         row_log_table_update(copy_rec, clust_index, offsets, rebuilt_old_pk);
       }
       else
