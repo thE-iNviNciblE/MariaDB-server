@@ -314,34 +314,33 @@ void UndorecApplier::apply_undo_rec()
 
   dict_index_t *index= dict_table_get_first_index(table);
   const dtuple_t *undo_tuple;
-  switch(type) {
+  switch (type) {
+  default:
+    ut_ad("invalid type" == 0);
+    MY_ASSERT_UNREACHABLE();
   case TRX_UNDO_INSERT_REC:
-    undo_rec= trx_undo_rec_get_row_ref(undo_rec, index, &undo_tuple,
-                                       heap);
+    undo_rec= trx_undo_rec_get_row_ref(undo_rec, index, &undo_tuple, heap);
+  insert:
+    log_insert(*undo_tuple, index);
     break;
   case TRX_UNDO_UPD_EXIST_REC:
   case TRX_UNDO_UPD_DEL_REC:
   case TRX_UNDO_DEL_MARK_REC:
-  {
     trx_id_t trx_id;
     roll_ptr_t roll_ptr;
     byte info_bits;
     undo_rec= trx_undo_update_rec_get_sys_cols(
       undo_rec, &trx_id, &roll_ptr, &info_bits);
 
-    undo_rec= trx_undo_rec_get_row_ref(
-      undo_rec, index, &undo_tuple, heap);
-
-    undo_rec= trx_undo_update_rec_get_update(
-      undo_rec, index, type, trx_id, roll_ptr, info_bits,
-      heap, &update);
-    break;
-  }
-  default:
-    ut_ad(0);
+    undo_rec= trx_undo_rec_get_row_ref(undo_rec, index, &undo_tuple, heap);
+    undo_rec= trx_undo_update_rec_get_update(undo_rec, index, type, trx_id,
+                                             roll_ptr, info_bits,
+                                             heap, &update);
+    if (type == TRX_UNDO_UPD_DEL_REC)
+      goto insert;
+    log_update(*undo_tuple, index);
   }
 
-  log_dml(*undo_tuple, index, heap);
   clear_undo_rec();
 }
 
@@ -363,7 +362,7 @@ ATTRIBUTE_COLD void trx_t::apply_log()
 
   UndorecApplier log_applier(block, id);
 
-  while (1)
+  for (;;)
   {
     trx_undo_rec_t *rec= trx_undo_page_get_first_rec(block, page_id.page_no(),
                                                      undo->hdr_offset);

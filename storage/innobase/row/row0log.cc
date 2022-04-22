@@ -3886,15 +3886,15 @@ void dict_table_t::clear(que_thr_t *thr)
   }
 }
 
-const rec_t *UndorecApplier::get_old_rec(
-  const dtuple_t &tuple, dict_index_t *index,
-  const rec_t **clust_rec, rec_offs **offsets, mtr_t *mtr)
+const rec_t *
+UndorecApplier::get_old_rec(const dtuple_t &tuple, dict_index_t *index,
+                            const rec_t **clust_rec, rec_offs **offsets)
 {
   ut_ad(index->is_primary());
   btr_pcur_t pcur;
 
   bool found= row_search_on_row_ref(&pcur, BTR_MODIFY_LEAF,
-                                    index->table, &tuple, mtr);
+                                    index->table, &tuple, &mtr);
   ut_a(found);
   *clust_rec= btr_pcur_get_rec(&pcur);
 
@@ -3911,11 +3911,12 @@ const rec_t *UndorecApplier::get_old_rec(
     ut_ad(len == DATA_ROLL_PTR_LEN);
     if (is_same(roll_ptr))
       return version;
-    trx_undo_prev_version_build(*clust_rec, mtr, version, index,
+    trx_undo_prev_version_build(*clust_rec, &mtr, version, index,
                                 *offsets, heap, &prev_version, nullptr,
                                 nullptr, 0, block);
     version= prev_version;
-  } while (version != nullptr);
+  }
+  while (version);
 
   return nullptr;
 }
@@ -3948,19 +3949,17 @@ static void row_log_mark_other_online_index_abort(dict_table_t *table)
 }
 
 void UndorecApplier::log_insert(const dtuple_t &tuple,
-                                dict_index_t *clust_index,
-                                mem_heap_t *heap)
+                                dict_index_t *clust_index)
 {
   DEBUG_SYNC_C("row_log_insert_handle");
   ut_ad(clust_index->is_primary());
   rec_offs offsets_[REC_OFFS_NORMAL_SIZE];
   rec_offs *offsets= offsets_;
-  mtr_t mtr;
 
   rec_offs_init(offsets_);
   mtr.start();
   const rec_t *rec;
-  const rec_t *match_rec= get_old_rec(tuple, clust_index, &rec, &offsets, &mtr);
+  const rec_t *match_rec= get_old_rec(tuple, clust_index, &rec, &offsets);
   ut_a(match_rec);
   const rec_t *copy_rec= match_rec;
   if (match_rec == rec)
@@ -4026,14 +4025,12 @@ void UndorecApplier::log_insert(const dtuple_t &tuple,
 }
 
 void UndorecApplier::log_update(const dtuple_t &tuple,
-                                dict_index_t *clust_index,
-                                mem_heap_t *heap)
+                                dict_index_t *clust_index)
 {
   rec_offs offsets_[REC_OFFS_NORMAL_SIZE];
   rec_offs offsets2_[REC_OFFS_NORMAL_SIZE];
   rec_offs *offsets= offsets_;
   rec_offs *prev_offsets= offsets2_;
-  mtr_t mtr;
 
   rec_offs_init(offsets_);
   rec_offs_init(offsets2_);
@@ -4051,8 +4048,7 @@ void UndorecApplier::log_update(const dtuple_t &tuple,
   const rec_t *rec;
   rec_t *prev_version;
   bool is_update= (type == TRX_UNDO_UPD_EXIST_REC);
-  const rec_t *match_rec= get_old_rec(
-    tuple, clust_index, &rec, &offsets, &mtr);
+  const rec_t *match_rec= get_old_rec(tuple, clust_index, &rec, &offsets);
   ut_a(match_rec);
 
   if (table_rebuild)
@@ -4157,10 +4153,3 @@ void UndorecApplier::log_update(const dtuple_t &tuple,
   }
 }
 
-void UndorecApplier::log_dml(
-  const dtuple_t &tuple, dict_index_t *clust_index, mem_heap_t *heap)
-{
-  if (type == TRX_UNDO_UPD_DEL_REC || type == TRX_UNDO_INSERT_REC)
-    return log_insert(tuple, clust_index, heap);
-  return log_update(tuple, clust_index, heap);
-}
