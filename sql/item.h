@@ -2739,6 +2739,9 @@ public:
   bool fix_fields(THD *, Item **);
   void fix_after_pullout(st_select_lex *new_parent, Item **ref, bool merge);
   void make_field(THD *thd, Send_field *tmp_field);
+#if MYSQL_VERSION_ID < 100300
+  Field *create_field_for_create_select(TABLE *table);
+#endif
   int save_in_field(Field *field,bool no_conversions);
   void save_org_in_field(Field *field, fast_field_copier optimizer_data);
   fast_field_copier setup_fast_field_copier(Field *field);

@@ -4084,6 +4084,23 @@ Field *Item::create_field_for_create_select(TABLE *table)
 }
 
 
+Field *Item_field::create_field_for_create_select(TABLE *table)
+{
+  Field *def_field, *tmp_field;
+  Field *f= ::create_tmp_field(table->in_use, table, this, type(),
+                            (Item ***) 0, &tmp_field, &def_field, 0, 0, 0, 0);
+  /*
+    normally, in CREATE ... SELECT <expr>, the newly created field will
+    have no default value, but in a special case of <expr> being a field name
+    the new field will get the default value of that field. This is illogical
+    and violates the sql standard, but it's a historical behavior we cannot
+    change just yet
+  */
+  f->default_value= field->default_value;
+  return f;
+}
+
+
 /**
   Create table from lists of fields and items (or just return TABLE
   object for pre-opened existing table).
